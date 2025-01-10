@@ -1,0 +1,13 @@
+[package]
+name = "new-rust"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.5"
+tokio = { version = "1", features = ["full"] }
+sea-orm = { version = "1.1", features = [ "sqlx-sqlite", "runtime-tokio" ] }
+serenity = "0.12.4"
+dotenv = "0.15.0"
