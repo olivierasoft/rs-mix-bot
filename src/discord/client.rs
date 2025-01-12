@@ -15,7 +15,9 @@ pub async fn retrieve_client(database: Arc<DatabaseConnection>) -> Result<Client
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let instance = DiscordInstance { db: database };
+    let instance = DiscordInstance {
+        db: Arc::clone(&database),
+    };
 
     let client = Client::builder(token, intents)
         .event_handler(instance)

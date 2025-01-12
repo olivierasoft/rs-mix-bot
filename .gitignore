@@ -1,2 +1,4 @@
 /target
 .env
+mix.sqlite
+migration/target

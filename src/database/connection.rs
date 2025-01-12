@@ -1,9 +1,9 @@
-use std::fs::File;
 use std::path::Path;
+use std::{fs::File, sync::Arc};
 
 use sea_orm::{Database, DatabaseConnection};
 
-pub async fn connect_to_sqlite() -> DatabaseConnection {
+pub async fn connect_to_sqlite() -> Arc<DatabaseConnection> {
     const SQLITE_PATH: &str = "mix.sqlite";
 
     if !Path::new(SQLITE_PATH).exists() {
@@ -14,7 +14,9 @@ pub async fn connect_to_sqlite() -> DatabaseConnection {
 
     let database_url = format!("sqlite://{}", SQLITE_PATH);
 
-    Database::connect(database_url)
+    let database = Database::connect(database_url)
         .await
-        .expect("Failed to create database connection")
+        .expect("Failed to create database connection");
+
+    Arc::new(database)
 }

@@ -1,9 +1,8 @@
 mod database;
 mod discord;
 
-use std::sync::Arc;
-
 use database::connection;
+
 use discord::client;
 
 extern crate dotenv;
@@ -16,7 +15,7 @@ async fn main() {
 
     let database = connection::connect_to_sqlite().await;
 
-    let mut client = client::retrieve_client(Arc::new(database))
+    let mut client = client::retrieve_client(database)
         .await
         .expect("Error while creating client");
 

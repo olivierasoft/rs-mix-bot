@@ -1,0 +1,5 @@
+export DATABASE_URL=sqlite://mix.sqlite
+
+sea-orm-cli generate entity \
+    -u sqlite://mix.sqlite \
+    -o src/database/entities
