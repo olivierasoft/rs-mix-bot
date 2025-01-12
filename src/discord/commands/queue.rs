@@ -1,11 +1,11 @@
 use std::error::Error;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, EntityTrait};
+use sea_orm::{ActiveModelTrait, EntityTrait, TransactionTrait};
 use serenity::all::{Channel, Context, Message};
 use crate::database::entities::prelude::{User};
 use super::super::event::DiscordInstance;
 
-use crate::database::entities::user;
+use crate::database::entities::{discord, user};
 
 impl DiscordInstance {
     pub async fn queue(&self, ctx: &Context, msg: &Message) -> Result<(), Box<dyn Error>> {
@@ -16,9 +16,18 @@ impl DiscordInstance {
                         msg.reply(&ctx.http, format!("User is: {}", user.name)).await?;
                     },
                     None => {
-                        // FIX: Error sending message: Exec(SqlxError(Database(SqliteError { code: 1299, message: "NOT NULL constraint failed: user.id" })))
-                        user::ActiveModel{name: Set(msg.author.name.to_owned()), ..Default::default()}.insert(self.db.as_ref()).await?;
-                        msg.reply(&ctx.http, "Usuário criado").await?;
+                        let txn = self.db.as_ref().begin().await?;
+
+                        let id = Set(msg.id.get().to_string());
+
+                        discord::ActiveModel{id: id.clone(), name: Set(msg.author.name.to_owned())}.insert(&txn).await?;
+                        user::ActiveModel{id: id.clone(), name: Set(msg.author.name.to_owned())}.insert(&txn).await?;
+
+                        if let Err(_) = txn.commit().await {
+                            msg.reply(&ctx.http, "User creation failed, try again...").await?;
+                        }
+
+                        msg.reply(&ctx.http, "User created...").await?;
                     }
                 }
             },
