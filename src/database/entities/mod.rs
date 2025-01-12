@@ -2,4 +2,8 @@
 
 pub mod prelude;
 
-pub mod player;
+pub mod discord;
+pub mod r#match;
+pub mod team;
+pub mod user;
+pub mod user_team;

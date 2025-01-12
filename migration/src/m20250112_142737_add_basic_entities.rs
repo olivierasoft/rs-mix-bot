@@ -11,9 +11,12 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Discord::Table)
                     .if_not_exists()
-                    .col(pk_auto(Discord::Id))
+                    .col(string(Discord::Id).primary_key())
+                        .foreign_key(ForeignKey::create().name("fk-discord-id")
+                            .from(Discord::Table, Discord::Id)
+                            .to(User::Table, User::Id)
+                        )
                     .col(string(Discord::Name))
-                    .col(string(Discord::Identifier))
                     .to_owned(),
             )
             .await?;
@@ -23,14 +26,14 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(User::Table)
                     .if_not_exists()
-                    .col(pk_auto(User::Id))
+                    .col(string(User::Id)
+                        .primary_key())
+                        .foreign_key(ForeignKey::create()
+                            .name("fk-discord-id")
+                            .from(User::Table, User::Id)
+                            .to(Discord::Table, Discord::Id)
+                        )
                     .col(string(User::Name))
-                    .col(ColumnDef::new(User::DiscordId).integer())
-                    .foreign_key(ForeignKey::create()
-                        .name("fk-user-discord-id")
-                        .from(User::Table, User::Id)
-                        .to(Discord::Table, Discord::Id)
-                    )
                     .to_owned(),
             )
             .await?;
@@ -52,7 +55,14 @@ impl MigrationTrait for Migration {
                     .table(UserTeam::Table)
                     .if_not_exists()
                     .col(integer(UserTeam::UserId))
-                    .col(integer(UserTeam::TeamId))
+                    .foreign_key(ForeignKey::create()
+                        .name("fk-user-team-user-id")
+                        .from(UserTeam::Table, UserTeam::UserId)
+                        .to(User::Table, User::Id))
+                    .col(integer(UserTeam::TeamId)).foreign_key(ForeignKey::create()
+                        .name("fk-user-team-team-id")
+                        .from(UserTeam::Table, UserTeam::TeamId)
+                    .to(Team::Table, Team::Id))
                     .primary_key(Index::create()
                         .col(UserTeam::TeamId)
                         .col(UserTeam::UserId)
@@ -135,8 +145,7 @@ impl MigrationTrait for Migration {
 enum User {
     Table,
     Id,
-    Name,
-    DiscordId,
+    Name
 }
 #[derive(DeriveIden)]
 enum Match {
@@ -163,6 +172,5 @@ enum UserTeam {
 enum Discord {
     Table,
     Name,
-    Identifier,
     Id,
 }
