@@ -2,7 +2,7 @@ use sea_orm::DatabaseConnection;
 use serenity::{all::GatewayIntents, Client};
 use std::error::Error;
 use std::{env, sync::Arc};
-
+use std::sync::{Mutex, OnceLock};
 use super::{
     enums::{DiscordEnv, Environment},
     event::DiscordInstance,
@@ -17,6 +17,7 @@ pub async fn retrieve_client(database: Arc<DatabaseConnection>) -> Result<Client
 
     let instance = DiscordInstance {
         db: Arc::clone(&database),
+        queue: Mutex::new(Vec::new())
     };
 
     let client = Client::builder(token, intents)
