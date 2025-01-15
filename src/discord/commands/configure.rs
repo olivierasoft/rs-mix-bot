@@ -1,5 +1,6 @@
 use super::super::event::DiscordInstance;
-use serenity::all::{Channel, ChannelType, Context, CreateChannel, GuildId, Message, PermissionOverwrite, PermissionOverwriteType, Permissions};
+use crate::discord::enums::{Environment, MixEvents};
+use serenity::all::{ButtonStyle, Channel, ChannelType, Context, CreateActionRow, CreateButton, CreateChannel, CreateEmbed, CreateEmbedAuthor, CreateMessage, GuildId, Message, PermissionOverwrite, PermissionOverwriteType, Permissions};
 use std::error::Error;
 
 impl DiscordInstance {
@@ -8,9 +9,13 @@ impl DiscordInstance {
         ctx: &Context,
         msg: &Message,
     ) -> Result<(), Box<dyn Error>> {
-        let guild = ctx.http.get_guild(msg.guild_id.unwrap()).await.unwrap();
+        let guild = ctx
+            .http
+            .get_guild(msg.guild_id.unwrap())
+            .await
+            .expect("Guild not found");
 
-        let queue_join_channel = CreateChannel::new("entrar-na-fila-2")
+        let queue_join_channel = CreateChannel::new("entrar-na-fila")
             .kind(ChannelType::Text)
             .permissions(vec![PermissionOverwrite {
                 allow: Permissions::empty(),
@@ -22,7 +27,29 @@ impl DiscordInstance {
 
         let channel = guild.create_channel(&ctx.http, queue_join_channel).await?;
 
-        msg.reply(&ctx.http, format!("Channel created with id: {}", channel.id)).await?;
+        let author =
+            CreateEmbedAuthor::new("Renan Oliveira").url("https://github.com/olivierasoft");
+
+        let embed = CreateEmbed::new()
+            .author(author)
+            .title("Entrar na fila")
+            .description("Para entrar na fila, digite !queue");
+
+        let components = vec![CreateButton::new(MixEvents::JoinQueue.as_str())
+            .label("Entrar na fila")
+            .style(ButtonStyle::Success)];
+
+        let button_action_row = CreateActionRow::Buttons(components);
+
+        channel
+            .send_message(&ctx.http, CreateMessage::new().add_embed(embed).components(vec![button_action_row]))
+            .await?;
+
+        msg.reply(
+            &ctx.http,
+            format!("Channel created with id: {}, you can move wherever you want", channel.id),
+        )
+            .await?;
 
         Ok(())
     }
