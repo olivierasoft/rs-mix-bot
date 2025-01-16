@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::database::entities::user;
 use sea_orm::DatabaseConnection;
+use serenity::all::{
+    CreateInteractionResponse, Interaction, InteractionType,
+};
 use serenity::{
     all::{Context, EventHandler, Message},
     async_trait,
@@ -25,5 +28,27 @@ impl EventHandler for DiscordInstance {
                 println!("Error sending message: {:?}", why);
             }
         };
+    }
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        match interaction.kind() {
+            InteractionType::Component => {
+                let component_interaction = interaction
+                    .as_message_component()
+                    .expect("Failed to get component interaction");
+
+                self.join_queue(&ctx, component_interaction.message.as_ref())
+                    .await
+                    .expect("Failed to join queue");
+
+                component_interaction
+                    .create_response(
+                        &ctx.http,
+                        CreateInteractionResponse::Acknowledge,
+                    )
+                    .await
+                    .expect("Failed to acknowledge interaction");
+            }
+            _ => {}
+        }
     }
 }

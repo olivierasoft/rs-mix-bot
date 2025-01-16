@@ -5,6 +5,10 @@ use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, EntityTrait, TransactionTrait};
 use serenity::all::{Channel, Context, Message};
 use std::error::Error;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::sleep;
+
 impl DiscordInstance {
     pub async fn queue_push(
         &self,
@@ -19,14 +23,26 @@ impl DiscordInstance {
 
         let queue_lock = self.queue.lock();
 
-        msg.reply(
-            &ctx.http,
-            format!(
-                "You placed in queue, has {} users in queue.",
-                queue_lock.unwrap().len()
-            ),
-        )
+        let message = msg
+            .reply(
+                &ctx.http,
+                format!(
+                    "You placed in queue, has {} users in queue.",
+                    queue_lock.unwrap().len()
+                ),
+            )
             .await?;
+
+        let ctx = Arc::new(ctx.clone());
+        let message = Arc::new(message);
+
+        tokio::spawn(async move {
+            sleep(Duration::from_secs(5)).await;
+
+            if let Err(err) = message.delete(&ctx.http).await {
+                eprintln!("Failed to delete message: {:?}", err);
+            }
+        });
 
         Ok(())
     }

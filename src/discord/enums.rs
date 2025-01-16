@@ -8,12 +8,14 @@ pub enum DiscordEnv {
 
 pub enum MixEvents {
     JoinQueue,
+    LeftQueue,
 }
 
 impl Environment for MixEvents {
     fn as_str(&self) -> &'static str {
         match self {
             Self::JoinQueue => "JOIN_QUEUE",
+            Self::LeftQueue => "LEFT_QUEUE",
         }
     }
 }
