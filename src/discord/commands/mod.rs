@@ -1,3 +1,3 @@
 pub mod queue;
 pub mod configure;
-mod guild;
+pub mod guild;

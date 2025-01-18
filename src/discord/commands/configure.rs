@@ -17,8 +17,7 @@ impl DiscordInstance {
             .get_guild(msg.guild_id.unwrap())
             .await
             .expect("Guild not found");
-
-
+        
         let queue_join_channel = CreateChannel::new("entrar-na-fila")
             .kind(ChannelType::Text)
             .permissions(vec![PermissionOverwrite {
@@ -39,9 +38,11 @@ impl DiscordInstance {
 
         let components = vec![
             CreateButton::new(MixEvents::JoinQueue.as_str())
+                .custom_id(MixEvents::JoinQueue.as_str())
                 .label("Entrar na fila")
                 .style(ButtonStyle::Success),
             CreateButton::new(MixEvents::LeftQueue.as_str())
+                .custom_id(MixEvents::LeftQueue.as_str())
                 .label("Sair")
                 .style(ButtonStyle::Danger),
         ];
