@@ -2,8 +2,7 @@ use super::super::event::DiscordInstance;
 use crate::discord::enums::{Environment, MixEvents};
 use serenity::all::{
     ButtonStyle, Channel, ChannelType, Context, CreateActionRow, CreateButton, CreateChannel,
-    CreateEmbed, CreateEmbedAuthor, CreateMessage, GuildId, Message, PermissionOverwrite,
-    PermissionOverwriteType, Permissions,
+    CreateEmbed, CreateMessage, Message, PermissionOverwrite, PermissionOverwriteType, Permissions,
 };
 use std::error::Error;
 
@@ -19,14 +18,17 @@ impl DiscordInstance {
             .await
             .expect("Guild not found");
 
+
         let queue_join_channel = CreateChannel::new("entrar-na-fila")
             .kind(ChannelType::Text)
             .permissions(vec![PermissionOverwrite {
-                allow: Permissions::empty(),
-                deny: Permissions::SEND_MESSAGES,
-                kind: PermissionOverwriteType::Role(
-                    GuildId::new(msg.channel_id.get()).everyone_role(),
-                ),
+                allow: Permissions::VIEW_CHANNEL | Permissions::READ_MESSAGE_HISTORY,
+                deny: Permissions::SEND_MESSAGES
+                    | Permissions::CREATE_EVENTS
+                    | Permissions::SEND_TTS_MESSAGES
+                    | Permissions::CREATE_PUBLIC_THREADS
+                    | Permissions::CREATE_PRIVATE_THREADS,
+                kind: PermissionOverwriteType::Role(msg.guild_id.unwrap().everyone_role()),
             }]);
 
         let channel = guild.create_channel(&ctx.http, queue_join_channel).await?;
@@ -62,7 +64,7 @@ impl DiscordInstance {
                 channel.id
             ),
         )
-        .await?;
+            .await?;
 
         Ok(())
     }

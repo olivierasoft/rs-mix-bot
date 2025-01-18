@@ -54,7 +54,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(UserTeam::Table)
                     .if_not_exists()
-                    .col(integer(UserTeam::UserId))
+                    .col(string(UserTeam::UserId))
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-user-team-user-id")
@@ -99,6 +99,94 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager
+            .create_table(
+                Table::create()
+                    .table(Guild::Table)
+                    .if_not_exists()
+                    .col(string(Guild::Id).primary_key().unique_key())
+                    .col(string(Guild::Name))
+                    .col(ColumnDef::new(Guild::Description).string())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(GuildUser::Table)
+                    .if_not_exists()
+                    .col(string(GuildUser::GuildId))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-guild-user-guild-id")
+                            .from(GuildUser::Table, GuildUser::GuildId)
+                            .to(Guild::Table, Guild::Id),
+                    )
+                    .col(string(GuildUser::UserId))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-guild-user-user-id")
+                            .from(GuildUser::Table, GuildUser::UserId)
+                            .to(User::Table, User::Id),
+                    )
+                    .col(date_time(GuildUser::CreatedAt))
+                    .primary_key(
+                        Index::create()
+                            .col(GuildUser::GuildId)
+                            .col(GuildUser::UserId),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // Queue: tabela para filas
+        manager
+            .create_table(
+                Table::create()
+                    .table(Queue::Table)
+                    .if_not_exists()
+                    .col(string(Queue::Id).unique_key().primary_key())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-queue-guild-id")
+                            .from(Queue::Table, Queue::Id)
+                            .to(Guild::Table, Guild::Id),
+                    )
+                    .col(integer(Queue::Length))
+                    .to_owned(),
+            )
+            .await?;
+
+        // QueueUser: tabela de relacionamento entre Queue e User
+        manager
+            .create_table(
+                Table::create()
+                    .table(QueueUser::Table)
+                    .if_not_exists()
+                    .col(integer(QueueUser::QueueId))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-queue-user-queue-id")
+                            .from(QueueUser::Table, QueueUser::QueueId)
+                            .to(Queue::Table, Queue::Id),
+                    )
+                    .col(string(QueueUser::UserId))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-queue-user-user-id")
+                            .from(QueueUser::Table, QueueUser::UserId)
+                            .to(User::Table, User::Id),
+                    )
+                    .primary_key(
+                        Index::create()
+                            .col(QueueUser::QueueId)
+                            .col(QueueUser::UserId),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
@@ -121,6 +209,22 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(Discord::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(QueueUser::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(Queue::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(GuildUser::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(Guild::Table).to_owned())
             .await?;
 
         Ok(())
@@ -162,4 +266,32 @@ enum Discord {
     GlobalName,
     Email,
     Discriminator,
+}
+#[derive(DeriveIden)]
+enum Guild {
+    Table,
+    Id,
+    Name,
+    Description,
+}
+#[derive(DeriveIden)]
+enum GuildUser {
+    Table,
+    GuildId,
+    UserId,
+    CreatedAt,
+}
+#[derive(DeriveIden)]
+enum Queue {
+    Table,
+    DiscordId,
+    Id,
+    Length,
+}
+
+#[derive(DeriveIden)]
+enum QueueUser {
+    Table,
+    QueueId,
+    UserId,
 }

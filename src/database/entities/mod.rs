@@ -3,7 +3,11 @@
 pub mod prelude;
 
 pub mod discord;
+pub mod guild;
+pub mod guild_user;
 pub mod r#match;
+pub mod queue;
+pub mod queue_user;
 pub mod team;
 pub mod user;
 pub mod user_team;

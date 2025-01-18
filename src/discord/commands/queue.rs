@@ -1,9 +1,10 @@
 use super::super::event::DiscordInstance;
 use crate::database::entities::prelude::User;
 use crate::database::entities::{discord, user};
+use crate::discord::commands::guild::verify_guild;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, EntityTrait, TransactionTrait};
-use serenity::all::{Channel, Context, Message};
+use serenity::all::{Channel, Context, GuildId, Message};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -46,7 +47,7 @@ impl DiscordInstance {
 
         Ok(())
     }
-    pub async fn join_queue(&self, ctx: &Context, msg: &Message) -> Result<(), Box<dyn Error>> {
+    pub async fn join_queue(&self, ctx: &Context, msg: &Message, guild_id: Option<GuildId>) -> Result<(), Box<dyn Error>> {
         match msg.channel(&ctx.http).await? {
             Channel::Guild(channel) => {
                 match User::find_by_id(msg.author.id.get().to_string())
@@ -81,6 +82,10 @@ impl DiscordInstance {
                         if let Err(_) = txn.commit().await {
                             msg.reply(&ctx.http, "User creation failed, try again...")
                                 .await?;
+                        }
+
+                        if let Some(guild_id) = guild_id {
+                            verify_guild(self.db.as_ref(), &ctx, guild_id, msg.author.clone()).await?;
                         }
 
                         self.queue_push(ctx, msg, user).await?;

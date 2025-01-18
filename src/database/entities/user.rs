@@ -20,6 +20,10 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Discord,
+    #[sea_orm(has_many = "super::guild_user::Entity")]
+    GuildUser,
+    #[sea_orm(has_many = "super::queue_user::Entity")]
+    QueueUser,
     #[sea_orm(has_many = "super::user_team::Entity")]
     UserTeam,
 }
@@ -30,9 +34,39 @@ impl Related<super::discord::Entity> for Entity {
     }
 }
 
+impl Related<super::guild_user::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::GuildUser.def()
+    }
+}
+
+impl Related<super::queue_user::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::QueueUser.def()
+    }
+}
+
 impl Related<super::user_team::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserTeam.def()
+    }
+}
+
+impl Related<super::guild::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::guild_user::Relation::Guild.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(super::guild_user::Relation::User.def().rev())
+    }
+}
+
+impl Related<super::queue::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::queue_user::Relation::Queue.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(super::queue_user::Relation::User.def().rev())
     }
 }
 
