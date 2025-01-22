@@ -164,7 +164,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(QueueUser::Table)
                     .if_not_exists()
-                    .col(integer(QueueUser::QueueId))
+                    .col(string(QueueUser::QueueId))
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-queue-user-queue-id")

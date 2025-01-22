@@ -17,7 +17,7 @@ impl DiscordInstance {
             .get_guild(msg.guild_id.unwrap())
             .await
             .expect("Guild not found");
-        
+
         let queue_join_channel = CreateChannel::new("entrar-na-fila")
             .kind(ChannelType::Text)
             .permissions(vec![PermissionOverwrite {
@@ -65,7 +65,7 @@ impl DiscordInstance {
                 channel.id
             ),
         )
-            .await?;
+        .await?;
 
         Ok(())
     }

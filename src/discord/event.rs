@@ -21,12 +21,6 @@ impl EventHandler for DiscordInstance {
                 println!("Error sending message: {:?}", why);
             }
         }
-
-        if msg.content == "!queue" {
-            if let Err(why) = self.join_queue(&ctx, &msg, msg.guild_id).await {
-                println!("Error sending message: {:?}", why);
-            }
-        };
     }
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction.kind() {
@@ -36,16 +30,17 @@ impl EventHandler for DiscordInstance {
                     .expect("Failed to get component interaction");
 
                 if interaction.data.custom_id == MixEvents::JoinQueue.as_str() {
-                    self.join_queue(&ctx, interaction.message.as_ref(), interaction.guild_id)
+                    self.join_queue(&interaction, &ctx)
                         .await
                         .expect("Failed to join queue");
                 }
 
-                if interaction.data.custom_id == MixEvents::LeftQueue.as_str() {}
-                interaction
-                    .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
-                    .await
-                    .expect("Failed to acknowledge interaction");
+                if interaction.data.custom_id == MixEvents::LeftQueue.as_str() {
+                    interaction
+                        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+                        .await
+                        .expect("Failed to acknowledge interaction");
+                }
             }
             _ => {}
         }

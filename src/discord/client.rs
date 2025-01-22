@@ -22,7 +22,7 @@ pub async fn retrieve_client(database: Arc<DatabaseConnection>) -> Result<Client
         db: Arc::clone(&database),
         queue: Mutex::new(Vec::new()),
     };
-
+    
     let client = Client::builder(token, intents)
         .event_handler(instance)
         .await
