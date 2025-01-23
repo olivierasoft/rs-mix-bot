@@ -12,7 +12,7 @@ pub async fn verify_guild(
     user: SerenityUser,
 ) -> Result<guild::Model, Box<dyn Error>> {
     let database_guild = Guild::find_by_id(guild_id.to_string()).one(db).await?;
-
+    
     let discord_guild = ctx.http.get_guild(guild_id).await?;
 
     let database_guild = if let Some(guild) = database_guild {
@@ -20,7 +20,9 @@ pub async fn verify_guild(
             .one(db)
             .await?;
 
-        if let None = user_guild {}
+        if let None = user_guild {
+            println!("Here")
+        }
 
         guild
     } else {

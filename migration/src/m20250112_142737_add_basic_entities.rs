@@ -76,25 +76,25 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Match::Table)
+                    .table(Game::Table)
                     .if_not_exists()
-                    .col(pk_auto(Match::Id))
-                    .col(string(Match::Name))
-                    .col(ColumnDef::new(Match::HomeTeamId).integer())
+                    .col(pk_auto(Game::Id))
+                    .col(string(Game::Name))
+                    .col(ColumnDef::new(Game::HomeTeamId).integer())
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk-match-home-team-id")
-                            .from(Match::Table, Match::HomeTeamId)
+                            .name("fk-game-home-team-id")
+                            .from(Game::Table, Game::HomeTeamId)
                             .to(Team::Table, Team::Id),
                     )
-                    .col(ColumnDef::new(Match::AwayTeamId).integer())
+                    .col(ColumnDef::new(Game::AwayTeamId).integer())
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk-match-away-team-id")
-                            .from(Match::Table, Match::AwayTeamId)
+                            .name("fk-game-away-team-id")
+                            .from(Game::Table, Game::AwayTeamId)
                             .to(Team::Table, Team::Id),
                     )
-                    .col(date(Match::Date))
+                    .col(date(Game::Date))
                     .to_owned(),
             )
             .await?;
@@ -192,7 +192,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Match::Table).to_owned())
+            .drop_table(Table::drop().table(Game::Table).to_owned())
             .await?;
 
         manager
@@ -238,7 +238,7 @@ enum User {
     Name,
 }
 #[derive(DeriveIden)]
-enum Match {
+enum Game {
     Id,
     Table,
     Date,

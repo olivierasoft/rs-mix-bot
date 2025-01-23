@@ -3,9 +3,9 @@
 pub mod prelude;
 
 pub mod discord;
+pub mod game;
 pub mod guild;
 pub mod guild_user;
-pub mod r#match;
 pub mod queue;
 pub mod queue_user;
 pub mod team;

@@ -6,7 +6,10 @@ use crate::database::repository::queue_repository::QueueRepository;
 use crate::discord::commands::guild::verify_guild;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, TransactionTrait};
-use serenity::all::{Channel, ComponentInteraction, Context, CreateInteractionResponse, CreateInteractionResponseMessage, Message};
+use serenity::all::{
+    Channel, ComponentInteraction, Context, CreateInteractionResponse,
+    CreateInteractionResponseMessage, Message,
+};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,6 +29,42 @@ async fn remove_message<'a>(ctx: &Context, msg: &'a Message) -> Result<(), Box<d
 
     Ok(())
 }
+
+async fn create_match(
+    db: &DatabaseConnection,
+    interaction: &ComponentInteraction,
+    ctx: &Context,
+) -> Result<(), Box<dyn Error>> {
+    let queue_repository = QueueRepository::new(db);
+
+    let matching_users = queue_repository
+        .get_matching_users(&interaction.guild_id.unwrap().to_string())
+        .await?;
+
+    let txn = db.begin().await?;
+
+    let queue_repository = QueueRepository::new(&txn);
+
+    queue_repository
+        .remove_matching_users(&matching_users)
+        .await?;
+
+    txn.commit().await?;
+
+    let message = interaction
+        .message
+        .reply(&ctx.http, "Creating match...".to_string())
+        .await?;
+
+    interaction
+        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .await?;
+
+    remove_message(&ctx, &message).await?;
+
+    Ok(())
+}
+
 async fn add_user_to_queue(
     db: &DatabaseConnection,
     interaction: &ComponentInteraction,
@@ -40,14 +79,20 @@ async fn add_user_to_queue(
             .ephemeral(true)
             .content("You are already in the queue, wait for start...");
 
-        interaction.create_response(ctx, CreateInteractionResponse::Message(interaction_response)).await?;
+        interaction
+            .create_response(
+                ctx,
+                CreateInteractionResponse::Message(interaction_response),
+            )
+            .await?;
 
         return Ok(());
     }
 
     let count = queue_repository.count_queue(queue_id).await?;
 
-    let message = interaction.message
+    let message = interaction
+        .message
         .reply(
             &ctx.http,
             &format!(
@@ -57,9 +102,11 @@ async fn add_user_to_queue(
         )
         .await?;
 
-    interaction.create_response(&ctx.http, CreateInteractionResponse::Acknowledge).await?;
+    if count >= 1 {
+        create_match(&db, interaction, ctx).await?;
+    }
 
-    remove_message(ctx, &message).await?;
+    remove_message(&ctx, &message).await?;
 
     Ok(())
 }
@@ -75,13 +122,42 @@ impl DiscordInstance {
 
         let guild_id = interaction.guild_id.unwrap();
 
-        let guild = guild_repository.find_guild_queue(&guild_id.to_string()).await?;
+        let guild_with_queue = guild_repository
+            .find_guild_queue(&guild_id.to_string())
+            .await;
 
-        if let Some(queue) = guild.queue {
-            add_user_to_queue(&self.db.as_ref(), interaction, ctx, &guild_id.to_string(), &user.id.to_string()).await?;
+        let guild_with_queue = match guild_with_queue {
+            Ok(value) => value,
+            Err(_) => {
+                verify_guild(self.db.as_ref(), &ctx, guild_id, interaction.user.clone()).await?;
+
+                guild_repository
+                    .find_guild_queue(&guild_id.to_string())
+                    .await?
+            }
+        };
+
+        if let Some(queue) = guild_with_queue.queue {
+            add_user_to_queue(
+                &self.db.as_ref(),
+                interaction,
+                ctx,
+                &guild_id.to_string(),
+                &user.id.to_string(),
+            )
+                .await?;
         } else {
-            guild_repository.create_guild_queue(&guild.guild.id).await?;
-            add_user_to_queue(&self.db.as_ref(), interaction, ctx, &guild.guild.id, &user.id.to_string()).await?;
+            guild_repository
+                .create_guild_queue(&guild_with_queue.guild.id)
+                .await?;
+            add_user_to_queue(
+                &self.db.as_ref(),
+                interaction,
+                ctx,
+                &guild_with_queue.guild.id,
+                &user.id.to_string(),
+            )
+                .await?;
         }
 
         Ok(())
@@ -95,50 +171,56 @@ impl DiscordInstance {
             Channel::Guild(channel) => {
                 let guild_id = interaction.guild_id.expect("GuildId not found");
 
-                match User::find_by_id(interaction.message.author.id.get().to_string())
+                match User::find_by_id(interaction.user.id.get().to_string())
                     .one(self.db.as_ref())
                     .await?
                 {
                     Some(user) => {
-                        self.queue_push(&interaction, ctx, user)
-                            .await?;
+                        self.queue_push(&interaction, ctx, user).await?;
                     }
                     None => {
                         let txn = self.db.as_ref().begin().await?;
 
-                        let id = Set(interaction.message.author.id.get().to_string());
+                        let id = Set(interaction.user.id.get().to_string());
 
                         discord::ActiveModel {
                             id: id.clone(),
-                            name: Set(interaction.message.author.name.to_owned()),
-                            global_name: Set(interaction.message.author.global_name.to_owned()),
-                            email: Set(interaction.message.author.email.to_owned()),
-                            discriminator: Set(interaction.message.author.discriminator.map(|n| n.to_string())),
+                            name: Set(interaction.user.name.to_owned()),
+                            global_name: Set(interaction.user.global_name.to_owned()),
+                            email: Set(interaction.user.email.to_owned()),
+                            discriminator: Set(interaction
+                                .user
+                                .discriminator
+                                .map(|n| n.to_string())),
                         }
                             .insert(&txn)
                             .await?;
 
                         let user = user::ActiveModel {
                             id: id.clone(),
-                            name: Set(interaction.message.author.name.to_owned()),
+                            name: Set(interaction.user.name.to_owned()),
                         }
                             .insert(&txn)
                             .await?;
 
                         if let Err(_) = txn.commit().await {
-                            interaction.message.reply(&ctx.http, "User creation failed, try again...")
+                            interaction
+                                .message
+                                .reply(&ctx.http, "User creation failed, try again...")
                                 .await?;
                         }
 
-                        verify_guild(self.db.as_ref(), &ctx, guild_id, interaction.message.author.clone()).await?;
-
-                        self.queue_push(&interaction, ctx, user)
+                        verify_guild(self.db.as_ref(), &ctx, guild_id, interaction.user.clone())
                             .await?;
+
+                        self.queue_push(&interaction, ctx, user).await?;
                     }
                 }
             }
             _ => {
-                interaction.message.reply(&ctx.http, "This command can only be used in a server")
+                interaction
+                    .message
+                    .reply(&ctx.http, "This command can only be used in a server")
                     .await?;
             }
         }
