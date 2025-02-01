@@ -1,13 +1,16 @@
 use super::super::event::DiscordInstance;
 use crate::database::entities::prelude::User;
 use crate::database::entities::{discord, user};
+use crate::database::repository::game_repository::GameRepository;
 use crate::database::repository::guild_repository::GuildRepository;
 use crate::database::repository::queue_repository::QueueRepository;
 use crate::discord::commands::guild::verify_guild;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, TransactionTrait};
 use serenity::all::{
-    Channel, ComponentInteraction, Context, CreateInteractionResponse,
+    Channel, ComponentInteraction, Context, CreateEmbed, CreateInteractionResponse,
     CreateInteractionResponseMessage, Message,
 };
 use std::error::Error;
@@ -37,7 +40,7 @@ async fn create_match(
 ) -> Result<(), Box<dyn Error>> {
     let queue_repository = QueueRepository::new(db);
 
-    let matching_users = queue_repository
+    let mut matching_users = queue_repository
         .get_matching_users(&interaction.guild_id.unwrap().to_string())
         .await?;
 
@@ -49,18 +52,79 @@ async fn create_match(
         .remove_matching_users(&matching_users)
         .await?;
 
+    {
+        let mut rng = thread_rng();
+
+        &matching_users.users.shuffle(&mut rng);
+    }
+
+    let queue_size = 6;
+
+    let home_players = &matching_users.users[0..queue_size / 2].to_vec();
+    let away_players = &matching_users.users[queue_size / 2..queue_size].to_vec();
+    let game_name = format!("{} TEAM vs {} TEAM", &home_players[0].name, &away_players[0].name);
+
+    for user in home_players.iter() {
+        println!("Queue {}", &user.name)
+    }
+
+    for user in away_players.iter() {
+        println!("Queue {}", &user.name)
+    }
+
+    GameRepository::new(&txn)
+        .create_game_match_txn(
+            &matching_users.queue.id,
+            &home_players[0].name,
+            &away_players[0].name,
+            &game_name,
+            home_players,
+            away_players,
+        )
+        .await?;
+
     txn.commit().await?;
 
-    let message = interaction
-        .message
-        .reply(&ctx.http, "Creating match...".to_string())
-        .await?;
+    let mut embed_message = String::new();
+
+    embed_message.push_str(&format!("Game: {} \n\n\n", &game_name.to_uppercase()));
+
+    for player in home_players.iter() {
+        embed_message.push_str(&format!("<@{}> \n", &player.id));
+    }
+
+    embed_message.push_str("\nVS\n\n");
+
+    for player in away_players.iter() {
+        embed_message.push_str(&format!("<@{}> \n", &player.id));
+    }
+
+    embed_message.push_str("\n\nAs salas serão criadas automaticamente (e removidas após um tempo), deseja manter a sala pública ou privada?");
+
+    let embed = CreateEmbed::new()
+        .title("Partida encontrada")
+        .description(embed_message);
+
 
     interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().embed(embed),
+            ),
+        )
         .await?;
 
-    remove_message(&ctx, &message).await?;
+    {
+        let ctx = Arc::new(ctx.clone());
+        let interaction = Arc::new(interaction.clone());
+
+        tokio::spawn(async move {
+            sleep(Duration::from_secs(40)).await;
+
+            interaction.delete_response(&ctx.http).await.expect("Failed to delete message");
+        });
+    }
 
     Ok(())
 }
@@ -102,9 +166,14 @@ async fn add_user_to_queue(
         )
         .await?;
 
-    if count >= 1 {
+    if count >= 6 {
+        remove_message(&ctx, &message).await?;
         create_match(&db, interaction, ctx).await?;
+
+        return Ok(());
     }
+
+    interaction.create_response(&ctx.http, CreateInteractionResponse::Acknowledge).await?;
 
     remove_message(&ctx, &message).await?;
 
@@ -129,15 +198,15 @@ impl DiscordInstance {
         let guild_with_queue = match guild_with_queue {
             Ok(value) => value,
             Err(_) => {
-                verify_guild(self.db.as_ref(), &ctx, guild_id, interaction.user.clone()).await?;
-
                 guild_repository
                     .find_guild_queue(&guild_id.to_string())
                     .await?
             }
         };
 
-        if let Some(queue) = guild_with_queue.queue {
+        verify_guild(self.db.as_ref(), &ctx, guild_id, interaction.user.clone()).await?;
+
+        if let Some(_) = guild_with_queue.queue {
             add_user_to_queue(
                 &self.db.as_ref(),
                 interaction,
@@ -150,6 +219,7 @@ impl DiscordInstance {
             guild_repository
                 .create_guild_queue(&guild_with_queue.guild.id)
                 .await?;
+
             add_user_to_queue(
                 &self.db.as_ref(),
                 interaction,
@@ -162,13 +232,15 @@ impl DiscordInstance {
 
         Ok(())
     }
+
+    pub async fn check_if_user_is_in_queue() {}
     pub async fn join_queue(
         &self,
         interaction: &ComponentInteraction,
         ctx: &Context,
     ) -> Result<(), Box<dyn Error>> {
         match interaction.message.channel(&ctx.http).await? {
-            Channel::Guild(channel) => {
+            Channel::Guild(_) => {
                 let guild_id = interaction.guild_id.expect("GuildId not found");
 
                 match User::find_by_id(interaction.user.id.get().to_string())

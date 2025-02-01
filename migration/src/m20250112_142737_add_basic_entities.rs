@@ -80,6 +80,13 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(Game::Id))
                     .col(string(Game::Name))
+                    .col(ColumnDef::new(Game::GuildId).string().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-game-guild-id")
+                            .from(Game::Table, Game::GuildId)
+                            .to(Guild::Table, Guild::Id),
+                    )
                     .col(ColumnDef::new(Game::HomeTeamId).integer())
                     .foreign_key(
                         ForeignKey::create()
@@ -94,7 +101,7 @@ impl MigrationTrait for Migration {
                             .from(Game::Table, Game::AwayTeamId)
                             .to(Team::Table, Team::Id),
                     )
-                    .col(date(Game::Date))
+                    .col(date_time(Game::Date))
                     .to_owned(),
             )
             .await?;
@@ -243,6 +250,7 @@ enum Game {
     Table,
     Date,
     Name,
+    GuildId,
     HomeTeamId,
     AwayTeamId,
 }

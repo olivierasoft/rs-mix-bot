@@ -8,13 +8,22 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub name: String,
+    pub guild_id: String,
     pub home_team_id: Option<i32>,
     pub away_team_id: Option<i32>,
-    pub date: Date,
+    pub date: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::guild::Entity",
+        from = "Column::GuildId",
+        to = "super::guild::Column::Id",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    Guild,
     #[sea_orm(
         belongs_to = "super::team::Entity",
         from = "Column::AwayTeamId",
@@ -31,6 +40,12 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Team1,
+}
+
+impl Related<super::guild::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Guild.def()
+    }
 }
 
 impl ActiveModelBehavior for ActiveModel {}

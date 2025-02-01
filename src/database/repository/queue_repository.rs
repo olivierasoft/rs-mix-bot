@@ -81,9 +81,11 @@ where
         Ok(QueueWithUsers { queue, users })
     }
 
-    pub async fn remove_matching_users(&self, queue_with_users: &QueueWithUsers) -> Result<(), DbErr> {
+    pub async fn remove_matching_users(
+        &self,
+        queue_with_users: &QueueWithUsers,
+    ) -> Result<(), DbErr> {
         for user in queue_with_users.users.iter() {
-            println!("Guild: {}, User {}", &queue_with_users.queue.id, &user.id);
             QueueUser::delete_by_id((queue_with_users.queue.id.clone(), user.id.clone()))
                 .exec(self.connection)
                 .await?;
